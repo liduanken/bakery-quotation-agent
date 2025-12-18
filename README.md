@@ -4,19 +4,19 @@ AI-powered quotation system using LangChain and GPT-4/Claude for intelligent bak
 
 ## Overview
 
-An intelligent agent that generates professional bakery quotations through natural conversation. Built with **LangChain**, it orchestrates three tools to:
+An intelligent agent that generates professional bakery quotations through natural conversation. Built with LangChain, it orchestrates three tools to:
 - Query material costs from SQLite database
 - Fetch bill of materials from pricing API
 - Generate formatted quote documents
 
 ## Features
 
-- 🤖 Natural language conversation with LLM
-- 🔧 Three integrated tools (BOM API, Database, Template Renderer)
-- 💰 Automatic cost calculation with markup and VAT
-- 📄 Professional Markdown quote generation
-- 🔄 Context-aware conversation memory
-- ✨ Rich CLI interface
+- Natural language conversation with LLM
+- Three integrated tools (BOM API, Database, Template Renderer)
+- Automatic cost calculation with markup and VAT
+- Professional Markdown quote generation
+- Context-aware conversation memory
+- Rich CLI interface
 
 ## Quick Start
 
@@ -129,8 +129,8 @@ Agent: Perfect! Here's the summary:
 
 You: yes
 
-Agent: ✅ Quote Generated Successfully!
-       📄 File: out/quote_Q20251218_143022.md
+Agent: Quote Generated Successfully!
+       File: out/quote_Q20251218_143022.md
 ```
 
 ## Configuration
@@ -199,12 +199,12 @@ MODEL_NAME=claude-3-opus-20240229
 - Type `reset`, `restart`, or `new` to start a new quote
 
 ### Database Commands
-- `bakery-db list` - List all materials
-- `bakery-db get <name>` - Get material details
-- `bakery-db add <name> <unit> <cost>` - Add new material
-- `bakery-db update <name> <cost>` - Update material cost
-- `bakery-db search <pattern>` - Search materials
-- `bakery-db info` - Show database statistics
+- bakery-db list - List all materials
+- bakery-db get name - Get material details
+- bakery-db add name unit cost - Add new material
+- bakery-db update name cost - Update material cost
+- bakery-db search pattern - Search materials
+- bakery-db info - Show database statistics
 
 ## Troubleshooting
 
