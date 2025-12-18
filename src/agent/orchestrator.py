@@ -1,0 +1,452 @@
+"""Bakery Quotation Agent Orchestrator - LangChain Implementation"""
+from typing import List, Dict, Any
+import logging
+
+from langchain_openai import ChatOpenAI
+from langchain.agents import AgentExecutor
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain.memory import ConversationBufferMemory
+from langchain_core.tools import StructuredTool
+from langchain.agents import create_openai_functions_agent
+from pydantic import BaseModel, Field
+
+from ..config import Config
+from ..models import QuoteState, MissingMaterialError, APIConnectionError
+from .prompts import SYSTEM_PROMPT
+
+# Import tools (will be created next)
+from ..tools.database_tool import DatabaseTool
+from ..tools.bom_tool import BOMAPITool
+from ..tools.template_tool import TemplateTool
+from ..calculator import PricingCalculator
+from ..converter import UnitConverter
+
+logger = logging.getLogger(__name__)
+
+
+class BakeryQuotationAgent:
+    """Main agent orchestrator for bakery quotations"""
+    
+    def __init__(self, config: Config):
+        """
+        Initialize the Bakery Quotation Agent
+        
+        Args:
+            config: Application configuration
+        """
+        self.config = config
+        self.config.validate()
+        
+        # Initialize LLM
+        self.llm = self._initialize_llm()
+        
+        # Initialize tool instances
+        self.db_tool = DatabaseTool(self.config.database_path)
+        self.bom_tool = BOMAPITool(self.config.bom_api_url)
+        self.template_tool = TemplateTool(
+            self.config.template_path,
+            self.config.output_dir
+        )
+        
+        # Initialize tools for LangChain
+        self.tools = self._initialize_tools()
+        
+        # Initialize memory
+        self.memory = ConversationBufferMemory(
+            memory_key="chat_history",
+            return_messages=True,
+            output_key="output"
+        )
+        
+        # Create agent
+        self.agent = self._create_agent()
+        
+        # Create executor
+        self.executor = AgentExecutor(
+            agent=self.agent,
+            tools=self.tools,
+            memory=self.memory,
+            verbose=self.config.agent_verbose,
+            max_iterations=self.config.agent_max_iterations,
+            handle_parsing_errors=True
+        )
+        
+        # Quote state
+        self.quote_state = QuoteState()
+        self.quote_state.labor_rate = self.config.labor_rate
+        self.quote_state.markup_pct = self.config.markup_pct
+        self.quote_state.vat_pct = self.config.vat_pct
+        self.quote_state.currency = self.config.currency
+        self.quote_state.company_name = self.config.company_name
+        
+        logger.info("BakeryQuotationAgent initialized successfully")
+    
+    def _initialize_llm(self) -> ChatOpenAI:
+        """Initialize the language model"""
+        if self.config.openai_api_key:
+            logger.info(f"Initializing OpenAI model: {self.config.model_name}")
+            return ChatOpenAI(
+                model=self.config.model_name,
+                temperature=self.config.model_temperature,
+                openai_api_key=self.config.openai_api_key
+            )
+        elif self.config.anthropic_api_key:
+            # For Anthropic support, would use:
+            # from langchain_anthropic import ChatAnthropic
+            # return ChatAnthropic(...)
+            raise NotImplementedError("Anthropic support not yet implemented")
+        else:
+            raise ValueError("No API key provided")
+    
+    def _create_agent(self):
+        """Create the LangChain agent"""
+        prompt = ChatPromptTemplate.from_messages([
+            ("system", SYSTEM_PROMPT.format(
+                markup_pct=self.config.markup_pct,
+                vat_pct=self.config.vat_pct
+            )),
+            MessagesPlaceholder(variable_name="chat_history"),
+            ("human", "{input}"),
+            MessagesPlaceholder(variable_name="agent_scratchpad"),
+        ])
+        
+        return create_openai_functions_agent(
+            llm=self.llm,
+            tools=self.tools,
+            prompt=prompt
+        )
+    
+    def _initialize_tools(self) -> List[StructuredTool]:
+        """Initialize all tools for the agent"""
+        tools = [
+            self._create_job_types_tool(),
+            self._create_bom_estimate_tool(),
+            self._create_material_costs_tool(),
+            self._create_render_quote_tool(),
+        ]
+        
+        logger.info(f"Initialized {len(tools)} tools")
+        return tools
+    
+    # Tool 1: Get Job Types
+    def _create_job_types_tool(self) -> StructuredTool:
+        """Create tool to get available job types"""
+        
+        def get_job_types_impl() -> str:
+            """Get list of available bakery job types"""
+            try:
+                types = self.bom_tool.get_job_types()
+                logger.info(f"Retrieved job types: {types}")
+                return f"Available job types: {', '.join(types)}"
+            except Exception as e:
+                logger.error(f"Error fetching job types: {e}")
+                return f"Error fetching job types: {str(e)}"
+        
+        return StructuredTool.from_function(
+            func=get_job_types_impl,
+            name="get_job_types",
+            description="Get the list of available bakery job types (cupcakes, cake, pastry_box)"
+        )
+    
+    # Tool 2: Get BOM Estimate
+    def _create_bom_estimate_tool(self) -> StructuredTool:
+        """Create tool to get BOM estimate"""
+        
+        class GetBOMEstimateInput(BaseModel):
+            job_type: str = Field(
+                description="Type of bakery item (cupcakes, cake, or pastry_box)"
+            )
+            quantity: int = Field(
+                description="Number of items to produce",
+                gt=0
+            )
+        
+        def get_bom_estimate_impl(job_type: str, quantity: int) -> str:
+            """Get bill of materials and labor estimate"""
+            try:
+                logger.info(f"Getting BOM estimate for {quantity} × {job_type}")
+                estimate = self.bom_tool.estimate(job_type, quantity)
+                
+                # Store in state (convert to dict for compatibility)
+                self.quote_state.bom_data = estimate.to_dict()
+                self.quote_state.job_type = job_type
+                self.quote_state.quantity = quantity
+                
+                # Format response (use attribute access on Pydantic model)
+                materials_list = "\n".join([
+                    f"  - {m.name}: {m.qty} {m.unit}"
+                    for m in estimate.materials
+                ])
+                
+                return f"""BOM Estimate for {quantity} × {job_type}:
+
+Materials needed:
+{materials_list}
+
+Labor hours: {estimate.labor_hours} hours
+
+Next step: Query material costs from database."""
+                
+            except APIConnectionError as e:
+                logger.error(f"API connection error: {e}")
+                return f"""❌ Cannot connect to BOM API.
+Please ensure the pricing tool is running:
+  cd resources/bakery_pricing_tool
+  docker compose up --build
+
+Error: {str(e)}"""
+            except Exception as e:
+                logger.error(f"Error getting BOM estimate: {e}")
+                return f"Error getting BOM estimate: {str(e)}"
+        
+        return StructuredTool.from_function(
+            func=get_bom_estimate_impl,
+            name="get_bom_estimate",
+            description="Get bill of materials (BOM) and labor hours for a bakery job. Requires job_type and quantity.",
+            args_schema=GetBOMEstimateInput
+        )
+    
+    # Tool 3: Query Material Costs
+    def _create_material_costs_tool(self) -> StructuredTool:
+        """Create tool to query material costs"""
+        
+        class QueryMaterialCostsInput(BaseModel):
+            material_names: List[str] = Field(
+                description="List of material names to look up in database"
+            )
+        
+        def query_material_costs_impl(material_names: List[str]) -> str:
+            """Query material unit costs from database"""
+            try:
+                logger.info(f"Querying costs for materials: {material_names}")
+                costs = self.db_tool.get_materials_bulk(material_names)
+                
+                # Store in state
+                self.quote_state.material_costs = costs
+                
+                # Check for missing materials
+                found = set(costs.keys())
+                requested = set(material_names)
+                missing = requested - found
+                
+                if missing:
+                    msg = f"⚠️  Missing materials in database: {', '.join(missing)}\n"
+                    msg += f"Found: {len(found)}/{len(requested)} materials\n\n"
+                    if found:
+                        costs_list = "\n".join([
+                            f"  - {name}: {data['unit_cost']} {data['currency']}/{data['unit']}"
+                            for name, data in costs.items()
+                        ])
+                        msg += f"Available materials:\n{costs_list}"
+                    return msg
+                
+                # Format response
+                costs_list = "\n".join([
+                    f"  - {name}: {data['unit_cost']} {data['currency']}/{data['unit']}"
+                    for name, data in costs.items()
+                ])
+                
+                return f"""Material costs retrieved:
+{costs_list}
+
+All materials found. Ready to calculate quote totals."""
+                
+            except Exception as e:
+                logger.error(f"Error querying material costs: {e}")
+                return f"Error querying material costs: {str(e)}"
+        
+        return StructuredTool.from_function(
+            func=query_material_costs_impl,
+            name="query_material_costs",
+            description="Query unit costs for materials from the SQLite database. Takes a list of material names.",
+            args_schema=QueryMaterialCostsInput
+        )
+    
+    # Tool 4: Render Quote
+    def _create_render_quote_tool(self) -> StructuredTool:
+        """Create tool to render final quote"""
+        
+        class RenderQuoteInput(BaseModel):
+            customer_name: str = Field(description="Customer name")
+            due_date: str = Field(description="Delivery date in YYYY-MM-DD format")
+            company_name: str = Field(
+                default="The Artisan Bakery",
+                description="Bakery company name"
+            )
+            notes: str = Field(default="", description="Special notes or instructions")
+        
+        def render_quote_impl(
+            customer_name: str,
+            due_date: str,
+            company_name: str = "The Artisan Bakery",
+            notes: str = ""
+        ) -> str:
+            """Calculate totals and render the quote document"""
+            try:
+                logger.info(f"Rendering quote for {customer_name}")
+                
+                # Update state
+                self.quote_state.customer_name = customer_name
+                self.quote_state.due_date = due_date
+                self.quote_state.company_name = company_name
+                self.quote_state.notes = notes
+                
+                # Validate we have required data
+                if not self.quote_state.bom_data:
+                    return "❌ Error: No BOM data available. Please call get_bom_estimate first."
+                
+                if not self.quote_state.material_costs:
+                    return "❌ Error: No material costs available. Please call query_material_costs first."
+                
+                # Calculate totals
+                calc = self._calculate_quote_totals()
+                self.quote_state.calculations = calc
+                
+                # Prepare template data
+                quote_data = self._prepare_template_data(calc)
+                
+                # Render template
+                output_path = self.template_tool.render_and_save(quote_data)
+                
+                # Format summary
+                summary = f"""
+✅ Quote Generated Successfully!
+
+📄 File: {output_path}
+
+Summary:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+{self.quote_state.quantity} × {self.quote_state.job_type}
+Materials Subtotal:    {calc['materials_subtotal']:>8.2f} {self.quote_state.currency}
+Labor ({calc['labor_hours']}h @ £{self.quote_state.labor_rate}/h): {calc['labor_cost']:>8.2f} {self.quote_state.currency}
+Subtotal:              {calc['subtotal']:>8.2f} {self.quote_state.currency}
+Markup ({self.quote_state.markup_pct}%):        {calc['markup_value']:>8.2f} {self.quote_state.currency}
+Subtotal before VAT:   {calc['price_before_vat']:>8.2f} {self.quote_state.currency}
+VAT ({self.quote_state.vat_pct}%):             {calc['vat_value']:>8.2f} {self.quote_state.currency}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+TOTAL:                 {calc['total']:>8.2f} {self.quote_state.currency}
+
+Unit Price: {calc['unit_price']:.2f} {self.quote_state.currency} per {self.quote_state.job_type}
+Valid until: {quote_data['valid_until']}
+"""
+                logger.info(f"Quote generated successfully: {output_path}")
+                return summary
+                
+            except Exception as e:
+                logger.error(f"Error rendering quote: {e}", exc_info=True)
+                return f"Error rendering quote: {str(e)}"
+        
+        return StructuredTool.from_function(
+            func=render_quote_impl,
+            name="render_quote",
+            description="Calculate final pricing and render the quotation document. Requires customer_name and due_date.",
+            args_schema=RenderQuoteInput
+        )
+    
+    def _calculate_quote_totals(self) -> Dict[str, Any]:
+        """Calculate all quote totals with unit conversion"""
+        converter = UnitConverter()
+        calculator = PricingCalculator(
+            labor_rate=self.quote_state.labor_rate,
+            markup_pct=self.quote_state.markup_pct / 100,
+            vat_pct=self.quote_state.vat_pct / 100
+        )
+        
+        # Build material lines with costs
+        lines = []
+        for material in self.quote_state.bom_data['materials']:
+            name = material['name']
+            qty = material['qty']
+            bom_unit = material['unit']
+            
+            # Get cost from database
+            cost_data = self.quote_state.material_costs[name]
+            db_unit = cost_data['unit']
+            unit_cost = cost_data['unit_cost']
+            
+            # Convert units if needed
+            if bom_unit != db_unit:
+                qty_converted = converter.convert(qty, bom_unit, db_unit)
+            else:
+                qty_converted = qty
+            
+            line_cost = qty_converted * unit_cost
+            
+            lines.append({
+                'name': name,
+                'qty': qty,
+                'unit': bom_unit,
+                'unit_cost': unit_cost,
+                'line_cost': line_cost
+            })
+        
+        # Calculate using calculator
+        labor_hours = self.quote_state.bom_data['labor_hours']
+        calculations = calculator.calculate_quote(lines, labor_hours)
+        
+        # Convert to dict and add additional fields
+        calc_dict = calculations.to_dict()
+        calc_dict['unit_price'] = calculations.total / self.quote_state.quantity
+        calc_dict['lines'] = lines  # Use original dicts with line_cost
+        calc_dict['labor_hours'] = labor_hours
+        
+        return calc_dict
+    
+    def _prepare_template_data(self, calculations: Dict[str, Any]) -> Dict[str, Any]:
+        """Prepare data for template rendering"""
+        # Generate quote ID and dates
+        quote_id = self.quote_state.generate_quote_id()
+        quote_date = self.quote_state.get_quote_date()
+        valid_until = self.quote_state.get_valid_until(self.config.quote_valid_days)
+        
+        # Format material lines for template
+        lines = [
+            {
+                'name': line['name'],
+                'qty': f"{line['qty']:.2f}",
+                'unit': line['unit'],
+                'unit_cost': f"{line['unit_cost']:.2f}",
+                'line_cost': f"{line['line_cost']:.2f}"
+            }
+            for line in calculations['lines']
+        ]
+        
+        return {
+            'quote_id': quote_id,
+            'quote_date': quote_date,
+            'valid_until': valid_until,
+            'company_name': self.quote_state.company_name,
+            'customer_name': self.quote_state.customer_name,
+            'job_type': self.quote_state.job_type,
+            'quantity': self.quote_state.quantity,
+            'due_date': self.quote_state.due_date,
+            'lines': lines,
+            'labor_hours': f"{calculations['labor_hours']:.1f}",
+            'labor_rate': f"{self.quote_state.labor_rate:.2f}",
+            'labor_cost': f"{calculations['labor_cost']:.2f}",
+            'materials_subtotal': f"{calculations['materials_subtotal']:.2f}",
+            'subtotal': f"{calculations['subtotal']:.2f}",
+            'markup_pct': f"{self.quote_state.markup_pct:.0f}%",
+            'markup_value': f"{calculations['markup_value']:.2f}",
+            'price_before_vat': f"{calculations['price_before_vat']:.2f}",
+            'vat_pct': f"{self.quote_state.vat_pct:.0f}%",
+            'vat_value': f"{calculations['vat_value']:.2f}",
+            'total': f"{calculations['total']:.2f}",
+            'currency': self.quote_state.currency,
+            'notes': self.quote_state.notes or "Thank you for your business!"
+        }
+    
+    def invoke(self, user_input: str) -> Dict[str, Any]:
+        """Invoke the agent with user input"""
+        try:
+            response = self.executor.invoke({"input": user_input})
+            return response
+        except Exception as e:
+            logger.error(f"Error invoking agent: {e}", exc_info=True)
+            raise
+    
+    def reset(self) -> None:
+        """Reset the agent state for a new quote"""
+        self.quote_state.reset()
+        self.memory.clear()
+        logger.info("Agent state reset")

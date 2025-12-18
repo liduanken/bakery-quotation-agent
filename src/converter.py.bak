@@ -1,0 +1,101 @@
+"""Unit conversion utilities"""
+from typing import Dict, Tuple
+from enum import Enum
+
+
+class Unit(str, Enum):
+    """Supported units"""
+    KILOGRAM = "kg"
+    GRAM = "g"
+    LITER = "L"
+    MILLILITER = "ml"
+    EACH = "each"
+
+
+class UnitConversionError(Exception):
+    """Cannot convert between units"""
+    pass
+
+
+class UnitConverter:
+    """Convert quantities between compatible units"""
+    
+    # Conversion factors: (from_unit, to_unit) -> factor
+    CONVERSIONS: Dict[Tuple[str, str], float] = {
+        # Mass conversions
+        ('g', 'kg'): 0.001,
+        ('kg', 'g'): 1000,
+        
+        # Volume conversions
+        ('ml', 'L'): 0.001,
+        ('L', 'ml'): 1000,
+        
+        # Identity conversions
+        ('kg', 'kg'): 1.0,
+        ('g', 'g'): 1.0,
+        ('L', 'L'): 1.0,
+        ('ml', 'ml'): 1.0,
+        ('each', 'each'): 1.0,
+    }
+    
+    # Unit compatibility groups
+    MASS_UNITS = {'kg', 'g'}
+    VOLUME_UNITS = {'L', 'ml'}
+    COUNT_UNITS = {'each'}
+    
+    def convert(self, value: float, from_unit: str, to_unit: str) -> float:
+        """
+        Convert a value from one unit to another
+        
+        Args:
+            value: Quantity to convert
+            from_unit: Source unit
+            to_unit: Target unit
+            
+        Returns:
+            Converted value
+            
+        Raises:
+            UnitConversionError: If units are incompatible
+        """
+        # Check if units are the same
+        if from_unit == to_unit:
+            return value
+        
+        # Check if conversion exists
+        conversion_key = (from_unit, to_unit)
+        if conversion_key not in self.CONVERSIONS:
+            # Check if units are compatible
+            if not self._are_compatible(from_unit, to_unit):
+                raise UnitConversionError(
+                    f"Cannot convert between incompatible units: {from_unit} and {to_unit}"
+                )
+            else:
+                raise UnitConversionError(
+                    f"No conversion defined for {from_unit} to {to_unit}"
+                )
+        
+        factor = self.CONVERSIONS[conversion_key]
+        return value * factor
+    
+    def _are_compatible(self, unit1: str, unit2: str) -> bool:
+        """Check if two units are compatible for conversion"""
+        # Check if both are in the same unit group
+        if unit1 in self.MASS_UNITS and unit2 in self.MASS_UNITS:
+            return True
+        if unit1 in self.VOLUME_UNITS and unit2 in self.VOLUME_UNITS:
+            return True
+        if unit1 in self.COUNT_UNITS and unit2 in self.COUNT_UNITS:
+            return True
+        return False
+    
+    def get_compatible_units(self, unit: str) -> set:
+        """Get all units compatible with the given unit"""
+        if unit in self.MASS_UNITS:
+            return self.MASS_UNITS
+        elif unit in self.VOLUME_UNITS:
+            return self.VOLUME_UNITS
+        elif unit in self.COUNT_UNITS:
+            return self.COUNT_UNITS
+        else:
+            return {unit}

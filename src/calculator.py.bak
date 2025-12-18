@@ -1,0 +1,76 @@
+"""Pricing calculation utilities"""
+from typing import List, Dict, Any
+
+
+class PricingCalculator:
+    """Calculate quote totals with markup and VAT"""
+    
+    def __init__(self, labor_rate: float, markup_pct: float, vat_pct: float):
+        """
+        Initialize pricing calculator
+        
+        Args:
+            labor_rate: Cost per labor hour (e.g., 15.0 for £15/hour)
+            markup_pct: Markup percentage as decimal (e.g., 0.30 for 30%)
+            vat_pct: VAT percentage as decimal (e.g., 0.20 for 20%)
+        """
+        self.labor_rate = labor_rate
+        self.markup_pct = markup_pct
+        self.vat_pct = vat_pct
+    
+    def calculate_quote(
+        self,
+        material_lines: List[Dict[str, Any]],
+        labor_hours: float
+    ) -> Dict[str, float]:
+        """
+        Calculate complete quote pricing
+        
+        Pricing logic (as per specification):
+        1. materials_subtotal = Σ line_cost
+        2. labor_cost = labor_hours × labor_rate
+        3. subtotal = materials_subtotal + labor_cost
+        4. price_before_vat = subtotal × (1 + markup_pct)
+        5. total = price_before_vat × (1 + vat_pct)
+        
+        Args:
+            material_lines: List of material dictionaries with 'line_cost'
+            labor_hours: Total labor hours required
+            
+        Returns:
+            Dictionary with all calculated values
+        """
+        # Step 1: Calculate materials subtotal
+        materials_subtotal = sum(line['line_cost'] for line in material_lines)
+        
+        # Step 2: Calculate labor cost
+        labor_cost = labor_hours * self.labor_rate
+        
+        # Step 3: Calculate subtotal (before markup)
+        subtotal = materials_subtotal + labor_cost
+        
+        # Step 4: Apply markup
+        markup_value = subtotal * self.markup_pct
+        price_before_vat = subtotal + markup_value
+        # Or: price_before_vat = subtotal * (1 + markup_pct)
+        
+        # Step 5: Apply VAT
+        vat_value = price_before_vat * self.vat_pct
+        total = price_before_vat + vat_value
+        # Or: total = price_before_vat * (1 + vat_pct)
+        
+        return {
+            'materials_subtotal': materials_subtotal,
+            'labor_cost': labor_cost,
+            'subtotal': subtotal,
+            'markup_value': markup_value,
+            'price_before_vat': price_before_vat,
+            'vat_value': vat_value,
+            'total': total
+        }
+    
+    def calculate_unit_price(self, total: float, quantity: int) -> float:
+        """Calculate price per unit"""
+        if quantity <= 0:
+            raise ValueError("Quantity must be positive")
+        return total / quantity

@@ -1,0 +1,46 @@
+# Docker Compose for Bakery Quotation Agent with BOM API
+
+services:
+  # BOM API Service (from resources/bakery_pricing_tool)
+  bom-api:
+    build:
+      context: ./resources/bakery_pricing_tool
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - bakery-network
+
+  # Bakery Quotation Agent
+  quotation-agent:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - BOM_API_URL=http://bom-api:8000
+      - DATABASE_PATH=/app/resources/materials.sqlite
+      - TEMPLATE_PATH=/app/resources/quote_template.md
+      - OUTPUT_DIR=/app/output
+    volumes:
+      - ./output:/app/output:rw
+    depends_on:
+      bom-api:
+        condition: service_healthy
+    networks:
+      - bakery-network
+    stdin_open: true
+    tty: true
+
+networks:
+  bakery-network:
+    driver: bridge
+
+volumes:
+  data:
+  output:
