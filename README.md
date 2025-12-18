@@ -300,7 +300,3 @@ Restart Docker container.
 ## License
 
 MIT
-
-## Next Steps
-
-See `documentation/Implementation_Plan.md` for detailed implementation guide and architecture decisions.
