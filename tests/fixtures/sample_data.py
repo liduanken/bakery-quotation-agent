@@ -1,15 +1,15 @@
 """Sample test data factory"""
-from typing import Dict, Any, List
+from typing import Any
 
 
 class TestDataFactory:
     """Factory for creating test data"""
-    
+
     @staticmethod
     def create_bom_estimate(
         job_type: str = 'cupcakes',
         quantity: int = 24
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Create BOM estimate data"""
         materials_per_unit = {
             'cupcakes': [
@@ -34,13 +34,13 @@ class TestDataFactory:
                 {'name': 'sugar', 'unit': 'kg', 'qty_per_unit': 0.20},
             ],
         }
-        
+
         labor_per_unit = {
             'cupcakes': 0.05,
             'cake': 0.80,
             'pastry_box': 0.60
         }
-        
+
         materials = [
             {
                 'name': m['name'],
@@ -49,16 +49,16 @@ class TestDataFactory:
             }
             for m in materials_per_unit.get(job_type, [])
         ]
-        
+
         return {
             'job_type': job_type,
             'quantity': quantity,
             'materials': materials,
             'labor_hours': labor_per_unit.get(job_type, 0) * quantity
         }
-    
+
     @staticmethod
-    def create_material_costs() -> List[Dict[str, Any]]:
+    def create_material_costs() -> list[dict[str, Any]]:
         """Create sample material cost data"""
         return [
             {'name': 'flour', 'unit': 'kg', 'unit_cost': 0.90, 'currency': 'GBP'},
@@ -72,13 +72,13 @@ class TestDataFactory:
             {'name': 'salt', 'unit': 'kg', 'unit_cost': 0.40, 'currency': 'GBP'},
             {'name': 'yeast', 'unit': 'kg', 'unit_cost': 2.50, 'currency': 'GBP'},
         ]
-    
+
     @staticmethod
     def create_quote_data(
         quote_id: str = 'TEST001',
         job_type: str = 'cupcakes',
         quantity: int = 24
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Create complete quote data"""
         return {
             'quote_id': quote_id,
@@ -107,7 +107,7 @@ class TestDataFactory:
             'currency': 'GBP',
             'notes': ''
         }
-    
+
     @staticmethod
     def create_template_content() -> str:
         """Create sample template content"""

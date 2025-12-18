@@ -1,19 +1,19 @@
 """Data models for the Bakery Quotation Agent"""
-from dataclasses import dataclass, field
-from typing import Optional, List, Dict, Any
+from dataclasses import dataclass
 from datetime import datetime, timedelta
+from typing import Any
 
 
 @dataclass
 class QuoteState:
     """Tracks the current state of quote generation"""
-    
+
     # Required fields
-    job_type: Optional[str] = None
-    quantity: Optional[int] = None
-    customer_name: Optional[str] = None
-    due_date: Optional[str] = None
-    
+    job_type: str | None = None
+    quantity: int | None = None
+    customer_name: str | None = None
+    due_date: str | None = None
+
     # Optional fields with defaults
     company_name: str = "The Artisan Bakery"
     currency: str = "GBP"
@@ -21,13 +21,13 @@ class QuoteState:
     markup_pct: float = 30.0
     labor_rate: float = 15.0
     notes: str = ""
-    
+
     # Internal state
-    bom_data: Optional[Dict[str, Any]] = None
-    material_costs: Optional[Dict[str, Any]] = None
-    calculations: Optional[Dict[str, Any]] = None
-    quote_id: Optional[str] = None
-    
+    bom_data: dict[str, Any] | None = None
+    material_costs: dict[str, Any] | None = None
+    calculations: dict[str, Any] | None = None
+    quote_id: str | None = None
+
     def is_complete(self) -> bool:
         """Check if all required fields are filled"""
         return all([
@@ -36,8 +36,8 @@ class QuoteState:
             self.customer_name,
             self.due_date
         ])
-    
-    def get_missing_fields(self) -> List[str]:
+
+    def get_missing_fields(self) -> list[str]:
         """Return list of missing required fields"""
         missing = []
         if not self.job_type:
@@ -49,22 +49,22 @@ class QuoteState:
         if not self.due_date:
             missing.append("due_date")
         return missing
-    
+
     def generate_quote_id(self) -> str:
         """Generate unique quote ID"""
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         self.quote_id = f"Q{timestamp}"
         return self.quote_id
-    
+
     def get_quote_date(self) -> str:
         """Get current date in ISO format"""
         return datetime.now().strftime("%Y-%m-%d")
-    
+
     def get_valid_until(self, days: int = 30) -> str:
         """Calculate quote validity date"""
         valid_date = datetime.now() + timedelta(days=days)
         return valid_date.strftime("%Y-%m-%d")
-    
+
     def reset(self) -> None:
         """Reset state for new quote"""
         self.job_type = None
@@ -86,8 +86,8 @@ class MaterialLine:
     unit: str
     unit_cost: float
     line_cost: float
-    
-    def to_dict(self) -> Dict[str, Any]:
+
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for template"""
         return {
             'name': self.name,

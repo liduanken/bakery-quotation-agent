@@ -3,12 +3,13 @@
 Full implementation based on documentation/03_BOM_API_Tool.md
 Provides typed interface to the FastAPI pricing service.
 """
-import httpx
 import logging
 import time
-from typing import Optional, List, Dict, Literal
-from pydantic import BaseModel, Field, validator
 from enum import Enum
+from typing import Literal
+
+import httpx
+from pydantic import BaseModel, Field, validator
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +30,7 @@ class Material(BaseModel):
     name: str
     unit: Literal["kg", "L", "ml", "each"]
     qty: float = Field(gt=0)
-    
+
     def __str__(self):
         return f"{self.name}: {self.qty} {self.unit}"
 
@@ -38,7 +39,7 @@ class EstimateRequest(BaseModel):
     """Request for BOM estimate"""
     job_type: str
     quantity: int = Field(gt=0)
-    
+
     @validator('quantity')
     def validate_quantity(cls, v):
         if v <= 0:
@@ -50,13 +51,13 @@ class EstimateResponse(BaseModel):
     """BOM estimate response"""
     job_type: str
     quantity: int
-    materials: List[Material]
+    materials: list[Material]
     labor_hours: float = Field(ge=0)
-    
-    def get_material_names(self) -> List[str]:
+
+    def get_material_names(self) -> list[str]:
         """Get list of material names"""
         return [m.name for m in self.materials]
-    
+
     def to_dict(self) -> dict:
         """Convert to dictionary"""
         return {
@@ -92,7 +93,7 @@ class InvalidJobTypeError(BOMAPIError):
 
 class BOMAPITool:
     """Client for Bakery Pricing/BOM API"""
-    
+
     def __init__(
         self,
         base_url: str = "http://localhost:8000",
@@ -110,11 +111,11 @@ class BOMAPITool:
         self.base_url = base_url.rstrip('/')
         self.timeout = timeout
         self.max_retries = max_retries
-        self._client: Optional[httpx.Client] = None
-        
+        self._client: httpx.Client | None = None
+
         # Verify connection on init
         self._verify_connection()
-    
+
     def _get_client(self) -> httpx.Client:
         """Get or create HTTP client"""
         if self._client is None:
@@ -124,29 +125,29 @@ class BOMAPITool:
                 follow_redirects=True
             )
         return self._client
-    
+
     def close(self):
         """Close HTTP client"""
         if self._client:
             self._client.close()
             self._client = None
-    
+
     def __enter__(self):
         return self
-    
+
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.close()
-    
+
     # ========================================================================
     # Connection Management
     # ========================================================================
-    
+
     def _verify_connection(self):
         """Verify API is accessible"""
         try:
             response = self._get_client().get("/healthz")
             response.raise_for_status()
-            
+
             data = response.json()
             if data.get("status") == "ok":
                 logger.info(f"Connected to BOM API at {self.base_url}")
@@ -161,7 +162,7 @@ class BOMAPITool:
             ) from e
         except Exception as e:
             raise APIConnectionError(f"Health check failed: {e}") from e
-    
+
     def is_healthy(self) -> bool:
         """Check if API is healthy"""
         try:
@@ -169,12 +170,12 @@ class BOMAPITool:
             return response.status_code == 200 and response.json().get("status") == "ok"
         except Exception:
             return False
-    
+
     # ========================================================================
     # API Methods
     # ========================================================================
-    
-    def get_job_types(self) -> List[str]:
+
+    def get_job_types(self) -> list[str]:
         """
         Get list of available job types.
         
@@ -187,14 +188,14 @@ class BOMAPITool:
         try:
             response = self._get_client().get("/job-types")
             response.raise_for_status()
-            
+
             job_types = response.json()
             logger.debug(f"Available job types: {job_types}")
             return job_types
-            
+
         except httpx.HTTPError as e:
             raise APIConnectionError(f"Failed to get job types: {e}") from e
-    
+
     def estimate(
         self,
         job_type: str,
@@ -218,47 +219,47 @@ class BOMAPITool:
         # Validate inputs
         if quantity <= 0:
             raise ValueError(f"Quantity must be positive, got {quantity}")
-        
+
         # Normalize job type
         job_type_lower = job_type.lower().replace(' ', '_')
-        
+
         # Prepare request
         request_data = {
             "job_type": job_type_lower,
             "quantity": quantity
         }
-        
+
         try:
             response = self._get_client().post(
                 "/estimate",
                 json=request_data
             )
-            
+
             # Handle errors
             if response.status_code == 400:
                 error_detail = response.json().get('detail', 'Unknown error')
                 raise InvalidJobTypeError(f"Invalid job type '{job_type}': {error_detail}")
-            
+
             response.raise_for_status()
-            
+
             # Parse response
             data = response.json()
             estimate = EstimateResponse(**data)
-            
+
             logger.info(
                 f"BOM estimate: {quantity} × {job_type} → "
                 f"{len(estimate.materials)} materials, {estimate.labor_hours}h labor"
             )
-            
+
             return estimate
-            
+
         except httpx.HTTPStatusError as e:
             if e.response.status_code == 400:
                 raise InvalidJobTypeError(f"Invalid job type: {job_type}") from e
             raise APIConnectionError(f"API error: {e}") from e
         except httpx.HTTPError as e:
             raise APIConnectionError(f"Connection error: {e}") from e
-    
+
     def estimate_with_retry(
         self,
         job_type: str,
@@ -278,7 +279,7 @@ class BOMAPITool:
             Same as estimate() after all retries exhausted
         """
         last_error = None
-        
+
         for attempt in range(self.max_retries):
             try:
                 return self.estimate(job_type, quantity)
@@ -293,13 +294,13 @@ class BOMAPITool:
                     time.sleep(wait_time)
                 else:
                     logger.error(f"All {self.max_retries} attempts failed")
-        
+
         raise last_error
-    
+
     def estimate_multiple(
         self,
-        estimates: List[tuple]
-    ) -> List[EstimateResponse]:
+        estimates: list[tuple]
+    ) -> list[EstimateResponse]:
         """
         Get multiple estimates (useful for comparing options).
         
@@ -311,7 +312,7 @@ class BOMAPITool:
         """
         results = []
         errors = []
-        
+
         for job_type, quantity in estimates:
             try:
                 result = self.estimate(job_type, quantity)
@@ -319,16 +320,16 @@ class BOMAPITool:
             except Exception as e:
                 errors.append((job_type, quantity, str(e)))
                 logger.error(f"Failed to get estimate for {job_type} × {quantity}: {e}")
-        
+
         if errors:
             logger.warning(f"Failed {len(errors)} out of {len(estimates)} estimates")
-        
+
         return results
-    
+
     # ========================================================================
     # Helper Methods
     # ========================================================================
-    
+
     def format_estimate(self, estimate: EstimateResponse) -> str:
         """
         Format estimate for display.
@@ -344,17 +345,17 @@ class BOMAPITool:
             "",
             "Materials:",
         ]
-        
+
         for material in estimate.materials:
             lines.append(f"  • {material.name}: {material.qty} {material.unit}")
-        
+
         lines.extend([
             "",
             f"Labor: {estimate.labor_hours} hours",
         ])
-        
+
         return "\n".join(lines)
-    
+
     def estimate_summary(self, estimate: EstimateResponse) -> dict:
         """
         Get summary statistics for an estimate.
@@ -371,7 +372,7 @@ class BOMAPITool:
             'materials_per_unit': len(estimate.materials),
             'labor_per_unit': estimate.labor_hours / estimate.quantity
         }
-    
+
     def validate_job_type(self, job_type: str) -> bool:
         """
         Check if job type is valid.

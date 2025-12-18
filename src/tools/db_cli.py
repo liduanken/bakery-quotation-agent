@@ -1,12 +1,13 @@
 """CLI tool for material database management"""
-import click
 import sys
 from pathlib import Path
+
+import click
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from src.tools.database_tool import DatabaseTool, MaterialNotFoundError
+from src.tools.database_tool import DatabaseTool
 
 
 @click.group()
@@ -26,13 +27,13 @@ def cli(ctx, db):
 def list(db: DatabaseTool):
     """List all materials"""
     materials = db.list_all_materials()
-    
+
     click.echo(f"\n{'Name':<20} {'Unit':<8} {'Cost':<10} {'Currency':<8} {'Updated'}")
     click.echo("─" * 70)
-    
+
     for m in materials:
         click.echo(f"{m.name:<20} {m.unit:<8} {m.unit_cost:<10.2f} {m.currency:<8} {m.last_updated}")
-    
+
     click.echo(f"\nTotal: {len(materials)} materials")
 
 
@@ -49,7 +50,7 @@ def get(db: DatabaseTool, name: str):
         click.echo(f"  Last Updated: {material.last_updated}\n")
     else:
         click.echo(f"❌ Material '{name}' not found", err=True)
-        
+
         # Suggest similar
         similar = db.search_materials(name[:3])
         if similar:
@@ -107,7 +108,7 @@ def delete(db: DatabaseTool, name: str):
 def search(db: DatabaseTool, pattern: str):
     """Search materials by name pattern"""
     materials = db.search_materials(pattern)
-    
+
     if materials:
         click.echo(f"\nFound {len(materials)} material(s) matching '{pattern}':\n")
         for m in materials:
@@ -121,7 +122,7 @@ def search(db: DatabaseTool, pattern: str):
 def info(db: DatabaseTool):
     """Show database information"""
     info = db.get_database_info()
-    
+
     click.echo("\n📊 Database Information")
     click.echo("─" * 50)
     click.echo(f"  Path: {info['path']}")

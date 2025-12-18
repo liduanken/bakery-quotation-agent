@@ -1,9 +1,10 @@
 """Pytest configuration and shared fixtures"""
-import pytest
-import tempfile
 import sqlite3
-from pathlib import Path
 import sys
+import tempfile
+from pathlib import Path
+
+import pytest
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -21,11 +22,11 @@ def temp_database():
     """Create a temporary test database with sample data"""
     with tempfile.NamedTemporaryFile(suffix='.db', delete=False) as f:
         db_path = f.name
-    
+
     # Initialize schema and data
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
-    
+
     # Create schema
     cursor.execute("""
         CREATE TABLE materials (
@@ -37,7 +38,7 @@ def temp_database():
             last_updated TEXT NOT NULL
         )
     """)
-    
+
     # Insert test data
     cursor.executemany(
         "INSERT INTO materials (name, unit, unit_cost, currency, last_updated) VALUES (?, ?, ?, ?, ?)",
@@ -53,12 +54,12 @@ def temp_database():
             ('salt', 'kg', 0.40, 'GBP', '2025-09-01'),
         ]
     )
-    
+
     conn.commit()
     conn.close()
-    
+
     yield db_path
-    
+
     # Cleanup
     import os
     try:
