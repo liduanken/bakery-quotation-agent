@@ -121,7 +121,7 @@ export const PromptBox = React.forwardRef<HTMLTextAreaElement & { clearInput?: (
               {activeTool && (
                 <>
                   <div className="h-4 w-px bg-border dark:bg-gray-600" />
-                  <button onClick={() => setSelectedTool(null)} className="flex h-8 items-center gap-2 rounded-full px-2 text-sm dark:hover:bg-[#3b4045] hover:bg-accent cursor-pointer dark:text-[#99ceff] text-[#2294ff] transition-colors flex-row items-center justify-center">
+                  <button onClick={() => setSelectedTool(null)} className="flex h-8 items-center gap-2 rounded-full px-2 text-sm dark:hover:bg-[#3b4045] hover:bg-accent cursor-pointer dark:text-[#f59e0b] text-[#d97706] transition-colors flex-row items-center justify-center">
                     {ActiveToolIcon && <ActiveToolIcon className="h-4 w-4" />}
                     {activeTool.shortName}
                     <XIcon className="h-4 w-4" />

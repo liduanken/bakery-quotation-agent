@@ -118,7 +118,7 @@ export default function Home() {
           <div className="max-w-4xl mx-auto space-y-6">
             {messages.length === 0 && (
               <div className="text-center text-gray-500 dark:text-gray-400 mt-8">
-                <div className="w-24 h-24 mx-auto mb-4 text-[#23938c]">
+                <div className="w-24 h-24 mx-auto mb-4 text-[#d97706]">
                   <svg viewBox="0 0 24 24" fill="currentColor">
                     <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2v6h-2zm0 8h2v2h-2z"/>
                   </svg>
@@ -138,14 +138,14 @@ export default function Home() {
                 <div className={`flex items-start space-x-3 max-w-3xl ${message.role === 'user' ? 'flex-row-reverse space-x-reverse' : ''}`}>
                   <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
                     message.role === 'user' 
-                      ? 'bg-[#23938c] text-white' 
+                      ? 'bg-[#d97706] text-white' 
                       : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
                   }`}>
                     {message.role === 'user' ? <UserIcon className="w-4 h-4" /> : <BotIcon className="w-4 h-4" />}
                   </div>
                   <div className={`flex-1 px-4 py-3 rounded-lg ${
                     message.role === 'user'
-                      ? 'bg-[#23938c] text-white'
+                      ? 'bg-[#d97706] text-white'
                       : 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100'
                   }`}>
                     {message.role === 'user' ? (

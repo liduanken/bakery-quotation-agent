@@ -150,8 +150,8 @@ export function Sidebar({ onNewChat, currentPage = 'home' }: SidebarProps) {
                               )}
                               variant="outline"
                               style={{
-                                backgroundColor: "#23938c20",
-                                color: "#23938c"
+                                backgroundColor: "#d9770620",
+                                color: "#d97706"
                               }}
                             >
                               AI
@@ -175,80 +175,8 @@ export function Sidebar({ onNewChat, currentPage = 'home' }: SidebarProps) {
                         )}
                       </motion.li>
                     </button>
-                    <Link
-                      href="/help"
-                      className={cn(
-                        "flex h-8 w-full flex-row items-center rounded-md px-2 py-1.5 transition hover:bg-muted hover:text-primary",
-                        pathname?.includes("help") && "bg-muted",
-                      )}
-                      style={pathname?.includes("help") ? { color: "#23938c" } : {}}
-                    >
-                      <HelpCircle className="h-4 w-4" />
-                      <motion.li variants={variants}>
-                        {!isCollapsed && (
-                          <div className="ml-2">
-                            <p className="text-sm font-medium">Help</p>
-                          </div>
-                        )}
-                      </motion.li>
-                    </Link>
                   </div>
                 </ScrollArea>
-              </div>
-              <div className="flex flex-col p-2">
-                <div>
-                  <DropdownMenu modal={false}>
-                    <DropdownMenuTrigger className="w-full">
-                      <div className="flex h-8 w-full flex-row items-center gap-2 rounded-md px-2 py-1.5 transition hover:bg-muted hover:text-primary">
-                        <Avatar className="size-4">
-                          <AvatarFallback>U</AvatarFallback>
-                        </Avatar>
-                        <motion.li
-                          variants={variants}
-                          className="flex w-full items-center gap-2"
-                        >
-                          {!isCollapsed && (
-                            <>
-                              <div className="flex flex-col">
-                                <p className="text-sm font-medium">User</p>
-                                <p className="text-xs text-muted-foreground" dir="rtl">المستخدم</p>
-                              </div>
-                              <ChevronsUpDown className="ml-auto h-4 w-4 text-muted-foreground/50" />
-                            </>
-                          )}
-                        </motion.li>
-                      </div>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent sideOffset={5}>
-                      <div className="flex flex-row items-center gap-2 p-2">
-                        <Avatar className="size-6">
-                          <AvatarFallback>JD</AvatarFallback>
-                        </Avatar>
-                        <div className="flex flex-col text-left">
-                          <span className="text-sm font-medium">John Doe</span>
-                          <span className="line-clamp-1 text-xs text-muted-foreground">
-                            john@example.com
-                          </span>
-                        </div>
-                      </div>
-                      <DropdownMenuSeparator />
-                                            <DropdownMenuItem>
-                        <UserCircle className="h-4 w-4" />
-                        <div className="flex flex-col">
-                          <span>Profile</span>
-                          <span className="text-xs text-muted-foreground" dir="rtl">الملف الشخصي</span>
-                        </div>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem className="flex items-center gap-2">
-                        <LogOut className="h-4 w-4" />
-                        <div className="flex flex-col">
-                          <span>Sign out</span>
-                          <span className="text-xs text-muted-foreground" dir="rtl">تسجيل الخروج</span>
-                        </div>
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
               </div>
             </div>
           </div>
