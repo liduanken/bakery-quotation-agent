@@ -92,6 +92,25 @@ bakery-agent
 python -m src.main
 ```
 
+### Run Frontend (Optional)
+
+```bash
+# In a new terminal, navigate to frontend
+cd frontend
+
+# Install dependencies
+npm install
+
+# Configure backend URL
+echo "NEXT_PUBLIC_BACKEND_URL=http://localhost:8001" > .env.local
+
+# Run development server
+npm run dev
+
+# Frontend will be available at:
+# - http://localhost:3000
+```
+
 ### Database Management
 
 ```bash
@@ -265,6 +284,17 @@ MODEL_NAME=claude-3-opus-20240229
 │   ├── materials.sqlite        # Material costs DB
 │   ├── quote_template.md       # Quote template
 │   └── bakery_pricing_tool/    # BOM API (Docker)
+├── frontend/                   # Next.js Frontend
+│   ├── src/
+│   │   ├── app/                # Next.js app directory
+│   │   │   ├── page.tsx        # Main quotation page
+│   │   │   └── layout.tsx      # Root layout
+│   │   ├── components/ui/      # Reusable UI components
+│   │   └── lib/
+│   │       └── bakery-api.ts   # API integration
+│   ├── public/                 # Static assets
+│   ├── package.json            # Node dependencies
+│   └── README.md               # Frontend documentation
 ├── output/                     # Generated quotes
 ├── requirements.txt            # Python dependencies
 ├── pyproject.toml              # Modern Python project config
@@ -273,6 +303,7 @@ MODEL_NAME=claude-3-opus-20240229
 
 ## Architecture
 
+- **Frontend:** Next.js 15 with React, TypeScript, Tailwind CSS, shadcn/ui
 - **API Framework:** FastAPI with automatic OpenAPI documentation
 - **Configuration:** Pydantic Settings with environment variable support
 - **LLM Integration:** LangChain with OpenAI/Anthropic (CLI mode)
