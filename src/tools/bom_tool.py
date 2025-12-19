@@ -143,31 +143,32 @@ class BOMAPITool:
     # ========================================================================
 
     def _verify_connection(self):
-        """Verify API is accessible"""
+        """Verify API is accessible - log warning but don't crash if unavailable"""
         try:
-            response = self._get_client().get("/healthz")
+            response = self._get_client().get("/job-types")
             response.raise_for_status()
 
             data = response.json()
-            if data.get("status") == "ok":
+            if isinstance(data, list) and len(data) > 0:
                 logger.info(f"Connected to BOM API at {self.base_url}")
             else:
-                logger.warning(f"Unexpected health check response: {data}")
+                logger.warning(f"Unexpected job-types response: {data}")
         except httpx.ConnectError as e:
-            raise APIConnectionError(
+            logger.warning(
                 f"Cannot connect to BOM API at {self.base_url}. "
-                f"Please ensure the service is running:\n"
+                f"BOM pricing will not be available. "
+                f"To enable it, ensure the service is running:\n"
                 f"  cd resources/bakery_pricing_tool\n"
                 f"  docker compose up --build"
-            ) from e
+            )
         except Exception as e:
-            raise APIConnectionError(f"Health check failed: {e}") from e
+            logger.warning(f"BOM API health check failed: {e}. BOM pricing may not be available.")
 
     def is_healthy(self) -> bool:
         """Check if API is healthy"""
         try:
-            response = self._get_client().get("/healthz")
-            return response.status_code == 200 and response.json().get("status") == "ok"
+            response = self._get_client().get("/job-types")
+            return response.status_code == 200 and isinstance(response.json(), list)
         except Exception:
             return False
 

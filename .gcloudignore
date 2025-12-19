@@ -1,0 +1,19 @@
+# Ignore frontend and other large directories for backend deployment
+frontend/
+.git/
+.venv/
+venv/
+node_modules/
+.pytest_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+*.pyc
+__pycache__/
+.DS_Store
+*.log
+deploy-bakery-to-gcp.sh
+documentation/
+out/
+tests/
+.github/

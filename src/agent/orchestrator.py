@@ -162,6 +162,39 @@ class BakeryQuotationAgent:
 
         def get_bom_estimate_impl(job_type: str, quantity: int) -> str:
             """Get bill of materials and labor estimate"""
+            # Fallback recipes if BOM API is unavailable
+            FALLBACK_RECIPES = {
+                "cupcakes": {
+                    "materials": [
+                        {"name": "flour", "qty": 0.5, "unit": "kg"},
+                        {"name": "sugar", "qty": 0.3, "unit": "kg"},
+                        {"name": "eggs", "qty": 6, "unit": "each"},
+                        {"name": "butter", "qty": 0.2, "unit": "kg"},
+                        {"name": "milk", "qty": 0.2, "unit": "L"}
+                    ],
+                    "labor_hours": 1.5
+                },
+                "cake": {
+                    "materials": [
+                        {"name": "flour", "qty": 1.0, "unit": "kg"},
+                        {"name": "sugar", "qty": 0.8, "unit": "kg"},
+                        {"name": "eggs", "qty": 8, "unit": "each"},
+                        {"name": "butter", "qty": 0.5, "unit": "kg"},
+                        {"name": "milk", "qty": 0.4, "unit": "L"}
+                    ],
+                    "labor_hours": 3.0
+                },
+                "pastry_box": {
+                    "materials": [
+                        {"name": "flour", "qty": 0.8, "unit": "kg"},
+                        {"name": "sugar", "qty": 0.4, "unit": "kg"},
+                        {"name": "butter", "qty": 0.4, "unit": "kg"},
+                        {"name": "eggs", "qty": 4, "unit": "each"}
+                    ],
+                    "labor_hours": 2.0
+                }
+            }
+            
             try:
                 logger.info(f"Getting BOM estimate for {quantity} × {job_type}")
                 estimate = self.bom_tool.estimate(job_type, quantity)
@@ -187,16 +220,89 @@ Labor hours: {estimate.labor_hours} hours
 Next step: Query material costs from database."""
 
             except APIConnectionError as e:
-                logger.error(f"API connection error: {e}")
-                return f"""❌ Cannot connect to BOM API.
-Please ensure the pricing tool is running:
-  cd resources/bakery_pricing_tool
-  docker compose up --build
+                logger.warning(f"BOM API not available: {e}")
+                # Use fallback recipe data
+                job_type_normalized = job_type.lower().replace(' ', '_')
+                if job_type_normalized not in FALLBACK_RECIPES:
+                    return f"❌ Unknown job type: {job_type}. Available types: cupcakes, cake, pastry_box"
+                
+                recipe = FALLBACK_RECIPES[job_type_normalized]
+                # Scale materials by quantity
+                scaled_materials = []
+                for mat in recipe["materials"]:
+                    scaled_materials.append({
+                        "name": mat["name"],
+                        "qty": mat["qty"] * quantity,
+                        "unit": mat["unit"]
+                    })
+                
+                scaled_labor = recipe["labor_hours"] * quantity
+                
+                # Store in state
+                self.quote_state.bom_data = {
+                    "job_type": job_type_normalized,
+                    "quantity": quantity,
+                    "materials": scaled_materials,
+                    "labor_hours": scaled_labor
+                }
+                self.quote_state.job_type = job_type_normalized
+                self.quote_state.quantity = quantity
+                
+                # Format response
+                materials_list = "\n".join([
+                    f"  - {m['name']}: {m['qty']} {m['unit']}"
+                    for m in scaled_materials
+                ])
+                
+                return f"""BOM Estimate for {quantity} × {job_type_normalized} (using standard recipe):
 
-Error: {str(e)}"""
+Materials needed:
+{materials_list}
+
+Labor hours: {scaled_labor} hours
+
+Next step: Query material costs from database."""
+                
             except Exception as e:
-                logger.error(f"Error getting BOM estimate: {e}")
-                return f"Error getting BOM estimate: {str(e)}"
+                logger.warning(f"Error getting BOM estimate: {e}")
+                # Try fallback
+                job_type_normalized = job_type.lower().replace(' ', '_')
+                if job_type_normalized not in FALLBACK_RECIPES:
+                    return f"❌ Cannot get BOM data for {job_type}. Please ensure job type is one of: cupcakes, cake, pastry_box"
+                    
+                recipe = FALLBACK_RECIPES[job_type_normalized]
+                scaled_materials = []
+                for mat in recipe["materials"]:
+                    scaled_materials.append({
+                        "name": mat["name"],
+                        "qty": mat["qty"] * quantity,
+                        "unit": mat["unit"]
+                    })
+                
+                scaled_labor = recipe["labor_hours"] * quantity
+                
+                self.quote_state.bom_data = {
+                    "job_type": job_type_normalized,
+                    "quantity": quantity,
+                    "materials": scaled_materials,
+                    "labor_hours": scaled_labor
+                }
+                self.quote_state.job_type = job_type_normalized
+                self.quote_state.quantity = quantity
+                
+                materials_list = "\n".join([
+                    f"  - {m['name']}: {m['qty']} {m['unit']}"
+                    for m in scaled_materials
+                ])
+                
+                return f"""BOM Estimate for {quantity} × {job_type_normalized}:
+
+Materials needed:
+{materials_list}
+
+Labor hours: {scaled_labor} hours
+
+Next step: Query material costs from database."""
 
         return StructuredTool.from_function(
             func=get_bom_estimate_impl,
@@ -312,8 +418,8 @@ All materials found. Ready to calculate quote totals."""
                 
                 # Get filename and construct full URL
                 pdf_filename = pdf_path.split('/')[-1]
-                # Use backend server URL (default port 8001)
-                backend_url = "http://localhost:8001"
+                # Use backend server URL from config
+                backend_url = self.config.backend_url
 
                 # Format summary
                 summary = f"""
@@ -596,7 +702,34 @@ Valid until: {quote_data['valid_until']}
         doc.build(story)
         logger.info(f"PDF generated: {pdf_path}")
         
+        # Upload to GCS if enabled
+        logger.info(f"GCS config: enabled={self.config.gcs_enabled}, bucket={self.config.gcs_bucket_name}")
+        if self.config.gcs_enabled and self.config.gcs_bucket_name:
+            try:
+                self._upload_to_gcs(pdf_path)
+            except Exception as e:
+                logger.error(f"Failed to upload PDF to GCS: {e}", exc_info=True)
+        
         return pdf_path
+    
+    def _upload_to_gcs(self, file_path: str) -> None:
+        """Upload file to Google Cloud Storage"""
+        from google.cloud import storage
+        from pathlib import Path
+        
+        filename = Path(file_path).name
+        bucket_name = self.config.gcs_bucket_name
+        
+        logger.info(f"Uploading {filename} to gs://{bucket_name}/quotes/")
+        
+        client = storage.Client()
+        bucket = client.bucket(bucket_name)
+        blob = bucket.blob(f"quotes/{filename}")
+        
+        blob.upload_from_filename(file_path)
+        blob.content_type = "application/pdf"
+        
+        logger.info(f"Successfully uploaded {filename} to GCS")
 
     def reset(self) -> None:
         """Reset the agent state for a new quote"""

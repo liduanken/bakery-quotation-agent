@@ -1,0 +1,37 @@
+# .gcloudignore for frontend deployment
+# This file tells gcloud which files to exclude when deploying
+
+# Don't ignore package-lock.json (needed for build)
+!package-lock.json
+
+# Development files
+.next/
+node_modules/
+.git/
+.gitignore
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Testing
+coverage/
+.nyc_output/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Documentation
+README.md
+*.md
+
+# Backup files
+*.backup

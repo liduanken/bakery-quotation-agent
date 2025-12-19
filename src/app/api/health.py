@@ -40,7 +40,8 @@ async def read_health() -> HealthResponse:
         import httpx
         from app.config import settings
 
-        response = httpx.get(f"{settings.bom_api_url}/healthz", timeout=2.0)
+        # Use /job-types instead of /healthz as it's more reliable
+        response = httpx.get(f"{settings.bom_api_url}/job-types", timeout=2.0)
         bom_status = "healthy" if response.status_code == 200 else "unhealthy"
     except Exception:
         bom_status = "unhealthy"

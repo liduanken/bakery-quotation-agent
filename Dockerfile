@@ -28,5 +28,9 @@ ENV PYTHONPATH=/app
 RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
 USER appuser
 
+# Expose port (Cloud Run will set PORT env var)
+EXPOSE 8001
+
 # Default command - Run FastAPI application
-CMD ["uvicorn", "src.app.main:app", "--host", "0.0.0.0", "--port", "8001"]
+# Use shell form to allow environment variable expansion
+CMD uvicorn src.app.main:app --host 0.0.0.0 --port ${PORT:-8001}

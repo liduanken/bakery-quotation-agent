@@ -24,6 +24,13 @@ class Config:
 
     # BOM API
     bom_api_url: str = "http://localhost:8000"
+    
+    # Backend API URL (for generating PDF links)
+    backend_url: str = "http://localhost:8001"
+    
+    # Google Cloud Storage
+    gcs_enabled: bool = False
+    gcs_bucket_name: str = ""
 
     # Pricing defaults
     labor_rate: float = 15.0
@@ -58,6 +65,11 @@ class Config:
 
             # BOM API
             bom_api_url=os.getenv("BOM_API_URL", "http://localhost:8000"),
+            backend_url=os.getenv("BACKEND_URL", "http://localhost:8001"),
+            
+            # Google Cloud Storage
+            gcs_enabled=os.getenv("GCS_ENABLED", "false").lower() == "true",
+            gcs_bucket_name=os.getenv("GCS_BUCKET_NAME", ""),
 
             # Pricing
             labor_rate=float(os.getenv("LABOR_RATE", "15.0")),
