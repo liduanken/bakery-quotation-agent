@@ -306,12 +306,20 @@ All materials found. Ready to calculate quote totals."""
 
                 # Render template
                 output_path = self.template_tool.render_and_save(quote_data)
+                
+                # Generate PDF
+                pdf_path = self._generate_pdf(output_path)
+                
+                # Get filename and construct full URL
+                pdf_filename = pdf_path.split('/')[-1]
+                # Use backend server URL (default port 8001)
+                backend_url = "http://localhost:8001"
 
                 # Format summary
                 summary = f"""
 ✅ Quote Generated Successfully!
 
-📄 File: {output_path}
+📄 [Download PDF]({backend_url}/api/v1/quotes/{pdf_filename})
 
 Summary:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -443,6 +451,152 @@ Valid until: {quote_data['valid_until']}
         except Exception as e:
             logger.error(f"Error invoking agent: {e}", exc_info=True)
             raise
+
+    def _generate_pdf(self, markdown_path: str) -> str:
+        """Generate PDF from markdown file using ReportLab"""
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib.units import inch
+        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+        from reportlab.lib import colors
+        from reportlab.lib.enums import TA_CENTER, TA_RIGHT
+        from pathlib import Path
+        import re
+        
+        # Read markdown
+        md_path = Path(markdown_path)
+        md_content = md_path.read_text()
+        
+        # Generate PDF path
+        pdf_path = str(md_path).replace('.md', '.pdf')
+        
+        # Create PDF
+        doc = SimpleDocTemplate(pdf_path, pagesize=A4,
+                                rightMargin=72, leftMargin=72,
+                                topMargin=72, bottomMargin=18)
+        
+        # Styles
+        styles = getSampleStyleSheet()
+        title_style = ParagraphStyle(
+            'CustomTitle',
+            parent=styles['Heading1'],
+            fontSize=24,
+            textColor=colors.HexColor('#2c3e50'),
+            spaceAfter=30,
+        )
+        heading_style = ParagraphStyle(
+            'CustomHeading',
+            parent=styles['Heading2'],
+            fontSize=16,
+            textColor=colors.HexColor('#34495e'),
+            spaceAfter=12,
+        )
+        bold_style = ParagraphStyle(
+            'Bold',
+            parent=styles['Normal'],
+            fontName='Helvetica-Bold',
+        )
+        
+        # Build content
+        story = []
+        lines = md_content.split('\n')
+        
+        table_data = []
+        in_table = False
+        
+        def escape_html(text):
+            """Escape special HTML characters"""
+            return text.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+        
+        def convert_markdown_bold(text):
+            """Convert markdown **bold** to HTML <b>bold</b>"""
+            # Replace **text** with <b>text</b>
+            parts = text.split('**')
+            result = []
+            for i, part in enumerate(parts):
+                if i % 2 == 1:  # odd indices are bold
+                    result.append(f'<b>{escape_html(part)}</b>')
+                else:
+                    result.append(escape_html(part))
+            return ''.join(result)
+        
+        for line in lines:
+            line = line.strip()
+            if not line or line == '---':
+                if in_table and table_data:
+                    # Create table
+                    t = Table(table_data)
+                    t.setStyle(TableStyle([
+                        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#3498db')),
+                        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                        ('ALIGN', (1, 0), (-1, -1), 'RIGHT'),  # Right-align numbers
+                        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                        ('FONTSIZE', (0, 0), (-1, 0), 10),
+                        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+                        ('GRID', (0, 0), (-1, -1), 1, colors.black),
+                    ]))
+                    story.append(t)
+                    story.append(Spacer(1, 12))
+                    table_data = []
+                    in_table = False
+                continue
+                
+            if line.startswith('# '):
+                text = convert_markdown_bold(line[2:])
+                story.append(Paragraph(text, title_style))
+            elif line.startswith('## '):
+                text = convert_markdown_bold(line[3:])
+                story.append(Paragraph(text, heading_style))
+            elif '|' in line and not line.startswith('|--') and not line.startswith('|:'):
+                # Table row
+                cells = [cell.strip() for cell in line.split('|')[1:-1]]
+                # Remove markdown bold syntax from table cells
+                cells = [cell.replace('**', '') for cell in cells]
+                table_data.append(cells)
+                in_table = True
+            elif line.startswith('**') or '**' in line:
+                # Bold text line
+                text = convert_markdown_bold(line)
+                story.append(Paragraph(text, styles['Normal']))
+                story.append(Spacer(1, 6))
+            elif line.startswith('*') and not line.startswith('**'):
+                # Italic text
+                text = escape_html(line)
+                story.append(Paragraph(f'<i>{text[1:-1]}</i>', styles['Normal']))
+                story.append(Spacer(1, 6))
+            elif line.startswith('- '):
+                # List item
+                text = convert_markdown_bold(line[2:])
+                story.append(Paragraph(f'• {text}', styles['Normal']))
+                story.append(Spacer(1, 6))
+            else:
+                text = convert_markdown_bold(line)
+                story.append(Paragraph(text, styles['Normal']))
+                story.append(Spacer(1, 6))
+        
+        # Handle remaining table
+        if in_table and table_data:
+            t = Table(table_data)
+            t.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#3498db')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                ('ALIGN', (1, 0), (-1, -1), 'RIGHT'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 10),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black),
+            ]))
+            story.append(t)
+        
+        # Build PDF
+        doc.build(story)
+        logger.info(f"PDF generated: {pdf_path}")
+        
+        return pdf_path
 
     def reset(self) -> None:
         """Reset the agent state for a new quote"""

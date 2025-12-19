@@ -161,14 +161,16 @@ class DatabaseTool:
         with self._get_connection() as conn:
             cursor = conn.cursor()
 
-            # Use parameterized query with IN clause
+            # Use parameterized query with IN clause and LOWER() for case-insensitive matching
             placeholders = ','.join('?' * len(material_names))
             query = f"""
                 SELECT * FROM materials 
-                WHERE name IN ({placeholders}) COLLATE NOCASE
+                WHERE LOWER(name) IN ({placeholders})
             """
 
-            cursor.execute(query, material_names)
+            # Convert material names to lowercase for comparison
+            lowercase_names = [name.lower() for name in material_names]
+            cursor.execute(query, lowercase_names)
             rows = cursor.fetchall()
 
             # Build result dictionary (convert to dict for compatibility)

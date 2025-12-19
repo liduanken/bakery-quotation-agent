@@ -1,6 +1,6 @@
 """Health endpoint definitions."""
 
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, status
 from pydantic import BaseModel, Field
@@ -12,7 +12,7 @@ class HealthResponse(BaseModel):
     """Schema returned by the health endpoint."""
 
     status: str = Field(default="ok")
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(tz=UTC))
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(tz=timezone.utc))
     database: str = Field(default="unknown", description="Database connectivity status")
     bom_api: str = Field(default="unknown", description="BOM API connectivity status")
 

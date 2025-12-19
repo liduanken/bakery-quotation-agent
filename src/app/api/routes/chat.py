@@ -6,14 +6,15 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field
 
-from src.agent.orchestrator import AgentOrchestrator
+from src.agent.orchestrator import BakeryQuotationAgent
+from src.config import Config
 from src.app.config import settings
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 logger = logging.getLogger(__name__)
 
 # Store active sessions (in production, use Redis or similar)
-active_sessions: dict[str, AgentOrchestrator] = {}
+active_sessions: dict[str, BakeryQuotationAgent] = {}
 
 
 class ChatMessage(BaseModel):
@@ -48,15 +49,17 @@ async def chat(request: ChatRequest) -> ChatResponse:
     try:
         logger.info(f"Chat request - Session: {request.session_id}, Message: {request.message[:50]}...")
 
-        # Get or create orchestrator for this session
+        # Get or create agent for this session
         if request.session_id not in active_sessions:
             logger.info(f"Creating new agent session: {request.session_id}")
-            active_sessions[request.session_id] = AgentOrchestrator()
+            config = Config.from_env()
+            active_sessions[request.session_id] = BakeryQuotationAgent(config)
 
-        orchestrator = active_sessions[request.session_id]
+        agent = active_sessions[request.session_id]
 
         # Process the message through the agent
-        response = orchestrator.run(request.message)
+        result = agent.invoke(request.message)
+        response = result.get("output", str(result))
 
         logger.info(f"Agent response length: {len(response)}")
 

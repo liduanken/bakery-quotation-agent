@@ -14,6 +14,7 @@ from loguru import logger
 from src.app.api.health import router as health_router
 from src.app.api.routes.quotations import router as quotations_router
 from src.app.api.routes.chat import router as chat_router
+from src.app.api.routes.quotes import router as quotes_router
 from src.app.config import settings
 from src.app.data_models.common import ErrorResponse, StatusEnum
 
@@ -63,6 +64,7 @@ def register_routes(app: FastAPI) -> None:
     app.include_router(health_router)
     app.include_router(quotations_router, prefix=settings.api_prefix)
     app.include_router(chat_router, prefix=settings.api_prefix)
+    app.include_router(quotes_router, prefix=settings.api_prefix)
 
 
 def register_default_routes(app: FastAPI) -> None:
