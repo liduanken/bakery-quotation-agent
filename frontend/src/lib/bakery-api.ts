@@ -140,3 +140,48 @@ export async function createQuotation(request: QuoteRequest): Promise<QuoteRespo
 export async function checkApiHealth(): Promise<HealthResponse> {
   return bakeryApi.checkHealth();
 }
+
+// ===== Chat/Agent API =====
+
+export interface ChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+export interface ChatRequest {
+  message: string;
+  session_id: string;
+  history: ChatMessage[];
+}
+
+export interface ChatResponse {
+  response: string;
+  session_id: string;
+}
+
+export async function sendChatMessage(request: ChatRequest): Promise<ChatResponse> {
+  const response = await fetch(`${config.baseUrl}/api/v1/chat`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(request),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || 'Failed to send chat message');
+  }
+
+  return response.json();
+}
+
+export async function clearChatSession(sessionId: string): Promise<void> {
+  const response = await fetch(`${config.baseUrl}/api/v1/chat/${sessionId}`, {
+    method: 'DELETE',
+  });
+
+  if (!response.ok && response.status !== 204) {
+    throw new Error('Failed to clear chat session');
+  }
+}
