@@ -16,26 +16,36 @@ services:
     networks:
       - bakery-network
 
-  # Bakery Quotation Agent
+  # Bakery Quotation Agent API
   quotation-agent:
     build:
       context: .
       dockerfile: Dockerfile
+    ports:
+      - "8001:8001"
     environment:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       - BOM_API_URL=http://bom-api:8000
       - DATABASE_PATH=/app/resources/materials.sqlite
       - TEMPLATE_PATH=/app/resources/quote_template.md
       - OUTPUT_DIR=/app/output
+      - LLM_PROVIDER=openai
+      - LLM_MODEL=gpt-4o-mini
+      - LLM_TEMPERATURE=0.0
     volumes:
       - ./output:/app/output:rw
+      - ./resources:/app/resources:ro
     depends_on:
       bom-api:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     networks:
       - bakery-network
-    stdin_open: true
-    tty: true
 
 networks:
   bakery-network:

@@ -28,5 +28,5 @@ ENV PYTHONPATH=/app
 RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
 USER appuser
 
-# Default command
-CMD ["python", "-m", "src.main"]
+# Default command - Run FastAPI application
+CMD ["uvicorn", "src.app.main:app", "--host", "0.0.0.0", "--port", "8001"]

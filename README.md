@@ -18,8 +18,6 @@ An intelligent agent that generates professional bakery quotations through natur
 - Context-aware conversation memory
 - Rich CLI interface
 
-## Quick Start
-
 ### Prerequisites
 
 - Python 3.10+
@@ -67,7 +65,24 @@ cd resources/bakery_pricing_tool
 docker compose up --build
 ```
 
-### Run Agent
+### Run Application
+
+**Option 1: REST API (Recommended)**
+
+```bash
+# Run the FastAPI server
+uvicorn src.app.main:app --reload --port 8001
+
+# Or using Docker Compose (includes BOM API)
+docker compose up --build
+
+# API will be available at:
+# - http://localhost:8001
+# - API docs: http://localhost:8001/docs
+# - Health check: http://localhost:8001/health
+```
+
+**Option 2: CLI Agent (Legacy)**
 
 ```bash
 # Using the installed script
@@ -103,6 +118,66 @@ bakery-db info
 ```
 
 ## Usage Example
+
+### REST API Usage
+
+**Create a Quotation:**
+
+```bash
+curl -X POST http://localhost:8001/api/v1/quotes \
+  -H "Content-Type: application/json" \
+  -d '{
+    "customer_name": "Jane Doe",
+    "job_type": "cupcakes",
+    "quantity": 24,
+    "delivery_date": "2025-12-20"
+  }'
+```
+
+Response:
+```json
+{
+  "quote_id": "Q20251218_143022",
+  "status": "success",
+  "customer_name": "Jane Doe",
+  "job_type": "cupcakes",
+  "quantity": 24,
+  "delivery_date": "2025-12-20",
+  "file_path": "/app/output/quote_Q20251218_143022.md",
+  "total_cost": 44.04,
+  "currency": "GBP",
+  "message": "Quote generated successfully"
+}
+```
+
+**Get Available Job Types:**
+
+```bash
+curl http://localhost:8001/api/v1/quotes/job-types
+```
+
+Response:
+```json
+["cupcakes", "wedding_cake", "birthday_cake", "bread_loaves"]
+```
+
+**Check API Health:**
+
+```bash
+curl http://localhost:8001/health
+```
+
+Response:
+```json
+{
+  "status": "healthy",
+  "timestamp": "2025-12-18T14:30:22.123456",
+  "database": "healthy",
+  "bom_api": "healthy"
+}
+```
+
+### CLI Agent Usage (Legacy)
 
 ```
 Agent: Hello! I'll help you create a bakery quotation.
@@ -162,8 +237,20 @@ MODEL_NAME=claude-3-opus-20240229
 
 ```
 ├── src/
+│   ├── app/                    # FastAPI Application
+│   │   ├── main.py             # FastAPI app factory
+│   │   ├── config.py           # Pydantic Settings
+│   │   ├── api/
+│   │   │   ├── health.py       # Health check endpoints
+│   │   │   └── routes/
+│   │   │       └── quotations.py  # Quote API routes
+│   │   ├── services/
+│   │   │   └── quotation.py    # Business logic
+│   │   ├── data_models/
+│   │   │   └── common.py       # Request/response models
+│   │   └── core/               # Core utilities
 │   ├── agent/
-│   │   ├── orchestrator.py     # Main agent logic
+│   │   ├── orchestrator.py     # LangChain agent (CLI)
 │   │   └── prompts.py          # System prompts
 │   ├── tools/
 │   │   ├── database_tool.py    # SQLite interface
@@ -173,23 +260,38 @@ MODEL_NAME=claude-3-opus-20240229
 │   ├── converter.py            # Unit conversions
 │   ├── config.py               # Configuration
 │   ├── models.py               # Data models
-│   └── main.py                 # Entry point
+│   └── main.py                 # CLI entry point (legacy)
 ├── resources/
 │   ├── materials.sqlite        # Material costs DB
 │   ├── quote_template.md       # Quote template
 │   └── bakery_pricing_tool/    # BOM API (Docker)
-├── out/                        # Generated quotes
-├── requirements.txt            # Legacy pip format
-└── pyproject.toml              # Modern Python project config
+├── output/                     # Generated quotes
+├── requirements.txt            # Python dependencies
+├── pyproject.toml              # Modern Python project config
+└── docker-compose.yml          # Multi-service deployment
 ```
 
 ## Architecture
 
-- **Framework:** LangChain with OpenAI/Anthropic
-- **Agent:** Function-calling agent with conversation memory
-- **Tools:** Four custom tools for data access
+- **API Framework:** FastAPI with automatic OpenAPI documentation
+- **Configuration:** Pydantic Settings with environment variable support
+- **LLM Integration:** LangChain with OpenAI/Anthropic (CLI mode)
+- **Service Layer:** Business logic separated from API routes
+- **Tools:** Database, BOM API, Template Renderer, Calculator, Converter
 - **Storage:** SQLite for materials, filesystem for quotes
+- **Middleware:** CORS, request logging with timing headers
+- **Health Checks:** Database and BOM API connectivity monitoring
 - **Package Manager:** uv for fast dependency management
+
+### REST API Endpoints
+
+- `GET /` - API information and status
+- `GET /health` - Detailed health check with service status
+- `GET /healthz` - Simple health check (Kubernetes-compatible)
+- `POST /api/v1/quotes` - Create a new quotation
+- `GET /api/v1/quotes/job-types` - List available job types
+- `GET /docs` - Interactive API documentation (Swagger UI)
+- `GET /redoc` - Alternative API documentation (ReDoc)
 
 ## Commands
 

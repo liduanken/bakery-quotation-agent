@@ -1,13 +1,17 @@
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.0
 langchain==0.3.13
 langchain-openai==0.2.14
 langchain-community==0.3.13
 langchain-core==0.3.28
 pydantic>=2.0.0,<3.0.0
+pydantic-settings>=2.5.0
 python-dotenv>=1.0.0
 httpx>=0.25.0
 chevron>=0.14.0
 rich>=13.0.0
 click>=8.0.0
+loguru>=0.7.0
 pytest>=7.4.0
 pytest-cov>=4.1.0
 pytest-asyncio>=0.21.0
