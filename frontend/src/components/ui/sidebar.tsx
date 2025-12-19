@@ -192,24 +192,6 @@ export function Sidebar({ onNewChat, currentPage = 'home' }: SidebarProps) {
                         )}
                       </motion.li>
                     </Link>
-                    <Link
-                      href="/docs"
-                      className={cn(
-                        "flex h-8 w-full flex-row items-center rounded-md px-2 py-1.5 transition hover:bg-muted hover:text-primary",
-                        pathname?.includes("docs") && "bg-muted",
-                      )}
-                      style={pathname?.includes("docs") ? { color: "#23938c" } : {}}
-                    >
-                      <BookOpen className="h-4 w-4" />
-                      <motion.li variants={variants}>
-                        {!isCollapsed && (
-                          <div className="ml-2 flex flex-col">
-                            <p className="text-sm font-medium">Documentation</p>
-                            <p className="text-xs text-muted-foreground" dir="rtl">التوثيق</p>
-                          </div>
-                        )}
-                      </motion.li>
-                    </Link>
                   </div>
                 </ScrollArea>
               </div>
