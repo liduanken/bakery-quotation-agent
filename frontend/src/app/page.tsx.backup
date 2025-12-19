@@ -1,0 +1,330 @@
+"use client";
+
+import { useRef, useEffect } from 'react';
+import { Sidebar } from '@/components/ui/sidebar';
+import { PromptBox } from '@/components/ui/chatgpt-prompt-input';
+import { DocumentUpload } from '@/components/ui/document-upload';
+import { PaymentComponent } from '@/components/ui/payment-component';
+import { BotIcon, UserIcon, AlertCircle, Loader2 } from 'lucide-react';
+import { useChatSession } from '@/lib/useChatSession';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import rehypeHighlight from 'rehype-highlight';
+import 'highlight.js/styles/github-dark.css';
+
+export default function Home() {
+  const {
+    messages,
+    isLoading,
+    error,
+    sendMessage,
+    createNewSession,
+    clearError,
+    isConnected,
+  } = useChatSession();
+
+  const promptBoxRef = useRef<HTMLTextAreaElement & { clearInput?: () => void }>(null);
+  const chatContainerRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll to bottom when new messages are added
+  useEffect(() => {
+    if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+    }
+  }, [messages]);
+
+  const handleNewChat = () => {
+    console.log('🔄 Starting new chat...');
+    createNewSession();
+    console.log('✅ New chat created successfully');
+  };
+
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const formData = new FormData(form);
+    const message = formData.get("message") as string;
+    
+    if (!message?.trim() || isLoading) return;
+
+    // Clear the form immediately before sending message
+    form.reset();
+    
+    // Clear the PromptBox internal state
+    if (promptBoxRef.current?.clearInput) {
+      promptBoxRef.current.clearInput();
+    }
+    
+    await sendMessage(message);
+  };
+
+  const handlePromptSubmit = async () => {
+    const form = document.querySelector('form') as HTMLFormElement;
+    if (form) {
+      const formData = new FormData(form);
+      const message = formData.get("message") as string;
+      
+      if (!message?.trim() || isLoading) return;
+
+      // Clear the form immediately before sending message
+      form.reset();
+      
+      // Clear the PromptBox internal state
+      if (promptBoxRef.current?.clearInput) {
+        promptBoxRef.current.clearInput();
+      }
+      
+      await sendMessage(message);
+    }
+  };
+
+  const handleDocumentUpload = async (file: File) => {
+    console.log('📄 Document uploaded:', file.name);
+    
+    // Send a message confirming the upload
+    await sendMessage(`I have uploaded the document: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)}MB)`);
+  };
+
+  const handlePaymentConfirm = async (method: string) => {
+    console.log('💳 Payment confirmed via:', method);
+    
+    // Send a message confirming the payment
+    await sendMessage(`I have completed the payment using ${method}`);
+  };
+
+  // Function to detect if message should show document upload
+  const shouldShowDocumentUpload = (content: string): boolean => {
+    const lowerContent = content.toLowerCase();
+    
+    // Only show document upload if it mentions upload AND document-related terms
+    // but NOT if it's about payment
+    const hasUploadKeyword = lowerContent.includes('upload');
+    const hasDocumentKeywords = [
+      'document', 'power of attorney', 'poa', 'scanned copy', 'file uploader'
+    ].some(keyword => lowerContent.includes(keyword));
+    const isPaymentRelated = [
+      'payment', 'pay', 'fees', 'total', 'amount', 'aed'
+    ].some(keyword => lowerContent.includes(keyword));
+    
+    return hasUploadKeyword && hasDocumentKeywords && !isPaymentRelated;
+  };
+
+  // Function to detect if message should show payment component
+  const shouldShowPaymentComponent = (content: string): boolean => {
+    const lowerContent = content.toLowerCase();
+    
+    // Only show payment component if EXPLICITLY asking for payment method
+    const isAskingForPayment = [
+      'how would you like to make the payment',
+      'choose payment method',
+      'proceed to payment',
+      'payment method',
+      'make the payment'
+    ].some(phrase => lowerContent.includes(phrase));
+    
+    // Must also mention an amount
+    const hasAmount = lowerContent.includes('aed') && /\d/.test(lowerContent);
+    
+    // Should NOT be asking for contact information
+    const isAskingForContact = [
+      'contact information',
+      'business address',
+      'phone number',
+      'email address',
+      'collect some contact'
+    ].some(phrase => lowerContent.includes(phrase));
+    
+    console.log('🔍 Payment detection:', {
+      isAskingForPayment,
+      hasAmount,
+      isAskingForContact,
+      shouldShow: isAskingForPayment && hasAmount && !isAskingForContact
+    });
+    
+    return isAskingForPayment && hasAmount && !isAskingForContact;
+  };
+
+  // Function to extract payment amount from message
+  const getPaymentAmount = (content: string): number => {
+    console.log('🔍 Extracting amount from:', content);
+    
+    // Look specifically for "total fees are AED X" pattern first
+    const totalFeesMatch = content.match(/total\s+fees\s+are\s+aed\s*(\d{1,3}(?:,\d{3})*|\d+)/i);
+    if (totalFeesMatch) {
+      const amountStr = totalFeesMatch[1].replace(/,/g, '');
+      const amount = parseInt(amountStr, 10);
+      console.log('💰 Extracted from "total fees":', amount, 'from:', totalFeesMatch[0]);
+      return amount;
+    }
+    
+    // Look for general "AED X" pattern
+    const aedMatch = content.match(/aed\s*(\d{1,3}(?:,\d{3})*|\d+)/i);
+    if (aedMatch) {
+      const amountStr = aedMatch[1].replace(/,/g, '');
+      const amount = parseInt(amountStr, 10);
+      console.log('💰 Extracted from AED pattern:', amount, 'from:', aedMatch[0]);
+      return amount;
+    }
+    
+    // Fallback: look for any number pattern near "total" or "fees"
+    const fallbackMatch = content.match(/(?:total|fees).*?(\d{1,3}(?:,\d{3})*|\d+)/i);
+    if (fallbackMatch) {
+      const amountStr = fallbackMatch[1].replace(/,/g, '');
+      const amount = parseInt(amountStr, 10);
+      console.log('💰 Fallback extracted amount:', amount, 'from:', fallbackMatch[0]);
+      return amount;
+    }
+    
+    console.log('⚠️ Could not extract payment amount from message');
+    return 0;
+  };
+
+  // Function to extract document type from message
+  const getDocumentType = (content: string): string => {
+    if (content.toLowerCase().includes('power of attorney') || content.toLowerCase().includes('poa')) {
+      return 'Power of Attorney';
+    }
+    if (content.toLowerCase().includes('passport')) {
+      return 'Passport Copy';
+    }
+    if (content.toLowerCase().includes('emirates id')) {
+      return 'Emirates ID Copy';
+    }
+    return 'Document';
+  };
+
+  return (
+    <div className="flex h-screen bg-background">
+      <Sidebar onNewChat={handleNewChat} currentPage="home" />
+      
+      <div className="flex-1 flex flex-col ml-[3.05rem]">
+        {/* Connection status */}
+        {!isConnected && (
+          <div className="bg-yellow-100 dark:bg-yellow-900 border-l-4 border-yellow-500 p-4">
+            <div className="flex items-center">
+              <AlertCircle className="h-5 w-5 text-yellow-600 dark:text-yellow-400 mr-2" />
+              <div className="space-y-1">
+                <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                  Connection to AI service lost. Attempting to reconnect...
+                </p>
+                <p className="text-sm text-yellow-800 dark:text-yellow-200" dir="rtl">
+                  انقطع الاتصال بخدمة الذكاء الاصطناعي. جاري محاولة إعادة الاتصال...
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+        
+        {/* Error display */}
+        {error && (
+          <div className="bg-red-100 dark:bg-red-900 border-l-4 border-red-500 p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400 mr-2" />
+                <p className="text-sm text-red-800 dark:text-red-200">{error}</p>
+              </div>
+              <button
+                onClick={clearError}
+                className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-200"
+              >
+                ×
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Chat messages */}
+        <div ref={chatContainerRef} className="flex-1 overflow-y-auto p-4 space-y-4">
+          <div className="max-w-4xl mx-auto space-y-6">
+            {messages.length === 0 && (
+              <div className="text-center text-gray-500 dark:text-gray-400 mt-8">
+                <img src="/tamm-icon.png" alt="Trade License Assistant" className="w-24 h-24 mx-auto mb-4 opacity-50" />
+                <div className="space-y-2">
+                  <p className="text-lg font-medium">Welcome to Trade License Assistant</p>
+                  <p className="text-lg font-medium" dir="rtl">مرحباً بك في مساعد الترخيص التجاري</p>
+                  <p className="text-sm">Start your UAE trade license application by typing a message below.</p>
+                  <p className="text-sm" dir="rtl">ابدأ طلب الترخيص التجاري في دولة الإمارات بكتابة رسالة أدناه.</p>
+                </div>
+              </div>
+            )}
+            
+            {messages.map((message, index) => (
+              <div key={index} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                <div className={`flex items-start space-x-3 max-w-3xl ${message.role === 'user' ? 'flex-row-reverse space-x-reverse' : ''}`}>
+                  <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
+                    message.role === 'user' 
+                      ? 'bg-[#23938c] text-white' 
+                      : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
+                  }`}>
+                    {message.role === 'user' ? <UserIcon className="w-4 h-4" /> : <BotIcon className="w-4 h-4" />}
+                  </div>
+                  <div className={`flex-1 px-4 py-3 rounded-lg ${
+                    message.role === 'user'
+                      ? 'bg-[#23938c] text-white'
+                      : 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100'
+                  }`}>
+                    {message.role === 'user' ? (
+                      <p className="whitespace-pre-wrap">{message.content}</p>
+                    ) : (
+                      <div className="prose prose-sm max-w-none dark:prose-invert">
+                        <ReactMarkdown 
+                          remarkPlugins={[remarkGfm]}
+                          rehypePlugins={[rehypeHighlight]}
+                        >
+                          {message.content}
+                        </ReactMarkdown>
+                        
+                        {/* Document Upload Component */}
+                        {shouldShowDocumentUpload(message.content) && (
+                          <DocumentUpload
+                            onFileUpload={handleDocumentUpload}
+                            acceptedTypes=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+                            maxSize={10}
+                            documentType={getDocumentType(message.content)}
+                          />
+                        )}
+
+                        {/* Payment Component */}
+                        {shouldShowPaymentComponent(message.content) && (
+                          <PaymentComponent
+                            totalAmount={getPaymentAmount(message.content)}
+                            currency="AED"
+                            onPaymentConfirm={handlePaymentConfirm}
+                          />
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Input section */}
+        <div className="border-t border-border dark:border-gray-600 p-4">
+          <div className="max-w-4xl mx-auto">
+            {isLoading && (
+              <div className="flex items-center justify-center mb-4 p-2">
+                <Loader2 className="h-5 w-5 animate-spin mr-2" />
+                <div className="space-y-1">
+                  <span className="text-sm text-muted-foreground">AI is thinking...</span>
+                  <span className="text-sm text-muted-foreground" dir="rtl">الذكاء الاصطناعي يفكر...</span>
+                </div>
+              </div>
+            )}
+            <form onSubmit={handleSubmit}>
+              <PromptBox 
+                ref={promptBoxRef}
+                name="message"
+                placeholder={isLoading ? "Please wait... | يرجى الانتظار..." : "Type your message... | اكتب رسالتك..."}
+                disabled={isLoading}
+                onSubmit={handlePromptSubmit}
+              />
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
