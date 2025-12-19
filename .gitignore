@@ -43,6 +43,7 @@ output/
 
 # Documentation
 documentation/
+Agentic Quotation Mini‑assessment (bakery).md
 
 # Resources
 resources/
@@ -58,3 +59,5 @@ htmlcov/
 
 # LangSmith
 .langchain/
+
+
