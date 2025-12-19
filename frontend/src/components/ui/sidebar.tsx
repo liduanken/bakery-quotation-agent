@@ -196,20 +196,6 @@ export function Sidebar({ onNewChat, currentPage = 'home' }: SidebarProps) {
                 </ScrollArea>
               </div>
               <div className="flex flex-col p-2">
-                <Link
-                  href="/settings"
-                  className="mt-auto flex h-8 w-full flex-row items-center rounded-md px-2 py-1.5 transition hover:bg-muted hover:text-primary"
-                >
-                  <Settings className="h-4 w-4 shrink-0" />
-                  <motion.li variants={variants}>
-                    {!isCollapsed && (
-                      <div className="ml-2 flex flex-col">
-                        <p className="text-sm font-medium">Settings</p>
-                        <p className="text-xs text-muted-foreground" dir="rtl">الإعدادات</p>
-                      </div>
-                    )}
-                  </motion.li>
-                </Link>
                 <div>
                   <DropdownMenu modal={false}>
                     <DropdownMenuTrigger className="w-full">
