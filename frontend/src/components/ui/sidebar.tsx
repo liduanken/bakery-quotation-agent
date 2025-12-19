@@ -114,11 +114,11 @@ export function Sidebar({ onNewChat, currentPage = 'home' }: SidebarProps) {
                   }}
                 >
                   <Image
-                    src={isCollapsed ? "/tamm-icon.png" : "/useful-link-logos-tamm.png"}
-                    alt={isCollapsed ? "TAMM Icon" : "TAMM Logo"}
+                    src={isCollapsed ? "/bakery-logo.jpg" : "/bakery-logo.jpg"}
+                    alt={isCollapsed ? "Bakery Logo" : "Bakery Quotation System"}
                     width={isCollapsed ? 28 : 140}
                     height={isCollapsed ? 28 : 38}
-                    className="object-contain max-w-full max-h-full transition-opacity duration-200"
+                    className="object-contain max-w-full max-h-full transition-opacity duration-200 rounded-full"
                     priority
                   />
                 </motion.div>
@@ -143,7 +143,6 @@ export function Sidebar({ onNewChat, currentPage = 'home' }: SidebarProps) {
                           <div className="ml-2 flex items-center gap-2">
                             <div className="flex flex-col">
                               <p className="text-sm font-medium">Chat</p>
-                              <p className="text-xs text-muted-foreground" dir="rtl">محادثة</p>
                             </div>
                             <Badge
                               className={cn(
@@ -170,9 +169,8 @@ export function Sidebar({ onNewChat, currentPage = 'home' }: SidebarProps) {
                       <Plus className="h-4 w-4" />
                       <motion.li variants={variants}>
                         {!isCollapsed && (
-                          <div className="ml-2 flex flex-col">
+                          <div className="ml-2">
                             <p className="text-sm font-medium">New Chat</p>
-                            <p className="text-xs text-muted-foreground" dir="rtl">محادثة جديدة</p>
                           </div>
                         )}
                       </motion.li>
@@ -188,9 +186,8 @@ export function Sidebar({ onNewChat, currentPage = 'home' }: SidebarProps) {
                       <HelpCircle className="h-4 w-4" />
                       <motion.li variants={variants}>
                         {!isCollapsed && (
-                          <div className="ml-2 flex flex-col">
+                          <div className="ml-2">
                             <p className="text-sm font-medium">Help</p>
-                            <p className="text-xs text-muted-foreground" dir="rtl">مساعدة</p>
                           </div>
                         )}
                       </motion.li>

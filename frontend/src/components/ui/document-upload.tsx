@@ -99,16 +99,10 @@ export function DocumentUpload({
             <p className="text-sm text-gray-600 dark:text-gray-400">
               Drop your {documentType} here or click to browse
             </p>
-            <p className="text-sm text-gray-600 dark:text-gray-400" dir="rtl">
-              اسحب {documentType} هنا أو انقر للتصفح
-            </p>
           </div>
           <div>
             <p className="text-xs text-gray-500 dark:text-gray-500">
               Accepted formats: {acceptedTypes} (max {maxSize}MB)
-            </p>
-            <p className="text-xs text-gray-500 dark:text-gray-500" dir="rtl">
-              الصيغ المقبولة: {acceptedTypes} (الحد الأقصى {maxSize}MB)
             </p>
           </div>
         </div>
